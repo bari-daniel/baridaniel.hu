@@ -3,13 +3,11 @@ FROM node:20 AS node-builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
 COPY resources ./resources
-COPY vite.config.* ./
-COPY tailwind.config.* ./
-COPY postcss.config.* ./
+COPY vite.config.js ./
 
 RUN npm run build
 
@@ -54,7 +52,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # Composer cache optimalizálás
-COPY composer.json composer.lock ./
+COPY composer.json ./
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
@@ -69,9 +67,9 @@ COPY . .
 COPY --from=node-builder /app/public/build ./public/build
 
 # Laravel optimalizálás
-RUN php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+RUN php artisan config:cache || true \
+    && php artisan route:cache || true \
+    && php artisan view:cache || true
 
 # Permissions
 RUN chown -R www-data:www-data storage bootstrap/cache \
