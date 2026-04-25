@@ -8,7 +8,6 @@ Route::get('/', function () {
         'message' => 'API is running',
         'status' => 'ok',
         'endpoints' => [
-            'login' => '/api/login',
             'posts' => '/api/posts'
         ]
     ]);
