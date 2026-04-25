@@ -42,4 +42,4 @@ RUN chown -R www-data:www-data storage bootstrap/cache \
 EXPOSE 8080
 
 # Web szerver indítása
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
+CMD ["sh", "-c", "mkdir -p /var/www/html/storage/framework/views /var/www/html/storage/framework/cache /var/www/html/storage/framework/sessions && chown -R www-data:www-data /var/www/html/storage && chmod -R 775 /var/www/html/storage && php artisan serve --host=0.0.0.0 --port=8080"]
