@@ -10,18 +10,20 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $user = User::where('email', $request->email)->first();
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
 
-        // Debug: mi jön be, és mi van az adatbázisban?
-        if (!$user)
-            return response()->json(['message' => 'User not found'], 401);
+        $user = User::where('email', $request->input('email'))->first();
 
-        // Kézi ellenőrzés logolása
-        $isMatch = Hash::check($request->password, $user->password);
+        if (!$user || !Hash::check($request->input('password'), $user->password)) {
+            \Log::warning('Failed login attempt', [
+                'email' => $request->input('email'),
+                'ip' => $request->ip(),
+            ]);
 
-        if (!$isMatch) {
-            \Log::error('Jelszó nem egyezik. Beírt: ' . $request->password . ' | Hash a DB-ben: ' . $user->password);
-            return response()->json(['message' => 'Invalid credentials (password mismatch)'], 401);
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
         return response()->json(['token' => $user->createToken('admin-token')->plainTextToken]);
