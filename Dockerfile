@@ -1,44 +1,87 @@
-# Build stage for frontend assets
+# ---------- FRONTEND BUILD ----------
 FROM node:20 AS node-builder
-WORKDIR /var/www/html
-COPY package.json .
-RUN npm install
-COPY . .
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY resources ./resources
+COPY vite.config.* ./
+COPY tailwind.config.* ./
+COPY postcss.config.* ./
+
 RUN npm run build
 
-# PHP application stage
+
+# ---------- PHP APP ----------
 FROM php:8.3-fpm
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        git \
-        unzip \
-        libzip-dev \
-        libonig-dev \
-        libpng-dev \
-        libjpeg-dev \
-        libfreetype6-dev \
-        libxml2-dev \
-        zlib1g-dev \
-        libcurl4-openssl-dev \
+# System deps
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    libzip-dev \
+    libonig-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libxml2-dev \
+    zlib1g-dev \
+    libcurl4-openssl-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
+# PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && docker-php-ext-install \
+        pdo_mysql \
+        mbstring \
+        exif \
+        pcntl \
+        bcmath \
+        gd \
+        zip \
     && pecl install redis \
     && docker-php-ext-enable redis
 
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Opcache (fontos Laravelhez)
+RUN docker-php-ext-install opcache
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 WORKDIR /var/www/html
 
+# Composer cache optimalizálás
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --prefer-dist \
+    --no-interaction \
+    --no-scripts
 
+# App copy
 COPY . .
-COPY --from=node-builder /var/www/html/public/build ./public/build
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod +x /var/www/html/entrypoint.sh
+# Frontend build copy
+COPY --from=node-builder /app/public/build ./public/build
 
-EXPOSE 8080
-CMD ["sh", "/var/www/html/entrypoint.sh"]
+# Laravel optimalizálás
+RUN php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache
+
+# Permissions
+RUN chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
+
+# Entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 9000
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
