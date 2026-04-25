@@ -8,57 +8,38 @@ COPY vite.config.js ./
 RUN npm run build
 
 # ---------- PHP APP ----------
-FROM php:8.3-cli
+# FRISSÍTVE: PHP 8.4 a Laravel 13-hoz
+FROM php:8.4-cli
 
-# Rendszerfüggőségek telepítése
+# System deps
 RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libzip-dev \
-    libonig-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libxml2-dev \
-    zlib1g-dev \
-    libcurl4-openssl-dev \
-    curl \
+    git unzip libzip-dev libonig-dev libpng-dev libjpeg-dev libfreetype6-dev libxml2-dev zlib1g-dev libcurl4-openssl-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP kiterjesztések
+# PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-        pdo_mysql \
-        mbstring \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        zip \
-        opcache
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache
 
-# Composer telepítése
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Composer csomagok telepítése
+# Composer install (fontos: a lock fájlt is másold be!)
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
-# App forráskód másolása
+# App copy
 COPY . .
 
-# Frontend build másolása
+# Frontend build
 COPY --from=node-builder /app/public/build ./public/build
 
-# Jogosultságok beállítása (fontos a fájlrendszer írásához)
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Permissions
+RUN chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-# Port beállítása
 EXPOSE 8080
 
-# Alkalmazás indítása a Laravel beépített szerverével
-# A --host=0.0.0.0 elengedhetetlen a Railway-en belüli eléréshez
+# Web szerver indítása
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
