@@ -1,21 +1,16 @@
 # ---------- FRONTEND BUILD ----------
 FROM node:20 AS node-builder
-
 WORKDIR /app
-
 COPY package.json ./
 RUN npm install
-
 COPY resources ./resources
 COPY vite.config.js ./
-
 RUN npm run build
 
-
 # ---------- PHP APP ----------
-FROM php:8.3-fpm
+FROM php:8.3-cli
 
-# System deps
+# Rendszerfüggőségek telepítése
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -30,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
+# PHP kiterjesztések
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
         pdo_mysql \
@@ -40,46 +35,30 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         bcmath \
         gd \
         zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis
+        opcache
 
-# Opcache (fontos Laravelhez)
-RUN docker-php-ext-install opcache
-
-# Composer
+# Composer telepítése
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Composer cache optimalizálás
-COPY composer.json ./
-RUN composer install \
-    --no-dev \
-    --optimize-autoloader \
-    --prefer-dist \
-    --no-interaction \
-    --no-scripts
+# Composer csomagok telepítése
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
-# App copy
+# App forráskód másolása
 COPY . .
 
-# Frontend build copy
+# Frontend build másolása
 COPY --from=node-builder /app/public/build ./public/build
 
-# Laravel optimalizálás
-RUN php artisan config:cache || true \
-    && php artisan route:cache || true \
-    && php artisan view:cache || true
+# Jogosultságok beállítása (fontos a fájlrendszer írásához)
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Permissions
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+# Port beállítása
+EXPOSE 8080
 
-# Entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-EXPOSE 9000
-
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["php-fpm"]
+# Alkalmazás indítása a Laravel beépített szerverével
+# A --host=0.0.0.0 elengedhetetlen a Railway-en belüli eléréshez
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
