@@ -11,12 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        // 1. Engedélyezd a proxykat
-        $middleware->trustProxies(at: '*');
-
-        // 2. Kényszerítsd ki a stateful API működést
-        $middleware->statefulApi();
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(except: [
+            'api/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
