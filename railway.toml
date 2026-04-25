@@ -1,0 +1,5 @@
+[build]
+  dockerfilePath = "Dockerfile"
+
+[dev]
+  port = 8080
