@@ -13,14 +13,17 @@ return new class extends Migration {
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
 
-            $table->string('title');
             $table->string('slug')->unique();
 
-            $table->longText('content'); // markdown
+            $table->string('title');
             $table->text('excerpt')->nullable();
+            $table->longText('content');
+
+            $table->string('title_en')->nullable();
+            $table->text('excerpt_en')->nullable();
+            $table->longText('content_en')->nullable();
 
             $table->string('cover_image')->nullable();
-
             $table->boolean('published')->default(false);
 
             $table->timestamps();

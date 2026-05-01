@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class Post extends Model
 {
     protected $fillable = [
-        'title',
         'slug',
+        'title',
+        'title_en',
         'content',
+        'content_en',
         'excerpt',
+        'excerpt_en',
         'cover_image',
         'published'
     ];
@@ -18,4 +21,9 @@ class Post extends Model
     protected $casts = [
         'published' => 'boolean',
     ];
+
+    public function scopePublished($query)
+    {
+        return $query->where('published', true);
+    }
 }
